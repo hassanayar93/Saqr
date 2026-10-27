@@ -13,9 +13,12 @@ pub struct LockFreeRingBuffer {
 impl LockFreeRingBuffer {
     pub const fn new() -> Self {
         const EMPTY_EVENT: MarketEvent = MarketEvent {
+            kind: 0,
             symbol_hash: 0,
             price_scaled: 0,
             volume_scaled: 0,
+            bid_depth_scaled: 0,
+            ask_depth_scaled: 0,
             is_buyer_maker: false,
             timestamp_ns: 0,
         };
@@ -54,6 +57,14 @@ impl LockFreeRingBuffer {
         self.head
             .store(current_head.wrapping_add(1), Ordering::Release);
         Some(event)
+    }
+
+    pub fn head(&self) -> u64 {
+        self.head.load(Ordering::Acquire)
+    }
+
+    pub fn tail(&self) -> u64 {
+        self.tail.load(Ordering::Acquire)
     }
 }
 

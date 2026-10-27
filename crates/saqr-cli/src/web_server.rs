@@ -6,21 +6,31 @@ use axum::response::{IntoResponse, Json};
 use axum::routing::get;
 use axum::Router;
 use saqr_core::config::env_settings::SaqrSettings;
+use saqr_core::engine::runtime::EngineRuntime;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
 #[derive(Clone)]
 pub struct AppState {
     pub settings: Arc<SaqrSettings>,
+    pub engine: Arc<EngineRuntime>,
 }
 
-pub async fn start_web(settings: SaqrSettings, web_root: &str) -> Result<(), std::io::Error> {
+pub async fn start_web(
+    settings: SaqrSettings,
+    engine: Arc<EngineRuntime>,
+    web_root: &str,
+) -> Result<(), std::io::Error> {
     let state = AppState {
         settings: Arc::new(settings.clone()),
+        engine,
     };
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/status", get(status))
+        .route("/api/engine", get(engine_status))
+        .route("/api/signals", get(signals))
+        .route("/api/positions", get(positions))
         .nest_service("/", ServeDir::new(web_root))
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -51,5 +61,26 @@ async fn status(State(st): State<AppState>) -> impl IntoResponse {
         "telegram_configured": !st.settings.telegram.bot_token.is_empty(),
         "dashboard_url": st.settings.cloud.public_dashboard_url,
         "web_port": st.settings.web_bind_port,
+        "enable_trading": st.settings.enable_trading,
     }))
+}
+
+async fn engine_status(State(st): State<AppState>) -> impl IntoResponse {
+    st.engine.refresh_status_snapshot();
+    let snapshot = st.engine.status.read().clone();
+    Json(snapshot)
+}
+
+async fn signals(State(st): State<AppState>) -> impl IntoResponse {
+    Json(st.engine.signals.read().clone())
+}
+
+async fn positions(State(st): State<AppState>) -> impl IntoResponse {
+    let mut list = st.engine.positions.read().clone();
+    let price = st.engine.status.read().last_price;
+    for p in &mut list {
+        p.current = price;
+        p.pnl = (price - p.entry) * p.lot.parse::<f64>().unwrap_or(0.0);
+    }
+    Json(list)
 }

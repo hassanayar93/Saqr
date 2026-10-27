@@ -1,5 +1,10 @@
+pub mod exchange_rules;
 pub mod http_client;
+pub mod order_executor;
 pub mod recv_window;
 pub mod rest_client;
+pub mod scale;
+pub mod signed_rest;
 pub mod time_sync;
+pub mod ws_client;
 pub mod ws_stream;

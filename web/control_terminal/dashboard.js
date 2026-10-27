@@ -6,11 +6,7 @@ const SIGNAL_REFRESH_INTERVAL = 4;
 let signalTimerSeconds = SIGNAL_REFRESH_INTERVAL;
 let countdownTimer = null;
 
-let openPositions = [
-  { id: 201, pair: 'BTC/USDT', type: 'BUY', lot: '0.15', entry: 64250, current: 65120, pnl: 130.50 },
-  { id: 202, pair: 'ETH/USDT', type: 'BUY', lot: '1.20', entry: 3450, current: 3490, pnl: 48.00 },
-  { id: 203, pair: 'AVAX/USDT', type: 'SELL', lot: '0.80', entry: 28.50, current: 29.40, pnl: -14.20 }
-];
+let openPositions = [];
 
 let liquidityPairs = [
   { pair: 'BTC / USDT', volume: 34.2 },
@@ -25,12 +21,8 @@ let tradeHistory = [
   { pair: 'ETH / USDT', type: 'BUY', lot: '1.00', entry: 3480, exit: 3465, pnl: -15.00, day: 'الجمعة', time: '10:05:00 م' }
 ];
 
-let signals = [
-  { id: 101, pair: 'BTC/USDT', direction: 'BUY', strengthScore: 92, timeframe: '15m', rsi: '68', macd: 'إيجابي', executed: false },
-  { id: 102, pair: 'ETH/USDT', direction: 'BUY', strengthScore: 78, timeframe: '1h', rsi: '58', macd: 'إيجابي', executed: false },
-  { id: 103, pair: 'SOL/USDT', direction: 'SELL', strengthScore: 88, timeframe: '5m', rsi: '31', macd: 'سلبي', executed: false },
-  { id: 104, pair: 'AVAX/USDT', direction: 'SELL', strengthScore: 74, timeframe: '15m', rsi: '29', macd: 'سلبي', executed: false }
-];
+let signals = [];
+let engineLive = null;
 
 function showToast(msg) {
   const toast = document.getElementById('toast');
@@ -430,6 +422,64 @@ function updateSyncClock() {
   el.innerText = new Date().toLocaleTimeString('ar-IQ', { hour12: false });
 }
 
+async function refreshFromEngineApis() {
+  try {
+    const [sigRes, posRes, engRes] = await Promise.all([
+      fetch('/api/signals'),
+      fetch('/api/positions'),
+      fetch('/api/engine')
+    ]);
+    if (sigRes.ok) {
+      const sigJson = await sigRes.json();
+      if (Array.isArray(sigJson)) {
+        signals = sigJson.map((s) => ({
+          id: s.id,
+          pair: s.pair,
+          direction: s.direction,
+          strengthScore: s.strength_score ?? s.strengthScore ?? 0,
+          timeframe: s.timeframe || 'live',
+          rsi: String(Math.round(s.sovereign_score ?? 50)),
+          macd: (s.hira_boost ?? 0) > 0 ? 'إيجابي' : 'محايد',
+          executed: !!s.executed
+        }));
+        renderSignals();
+      }
+    }
+    if (posRes.ok) {
+      const posJson = await posRes.json();
+      if (Array.isArray(posJson)) {
+        openPositions = posJson.map((p) => ({
+          id: p.id,
+          pair: p.pair,
+          type: p.side || p.type || 'BUY',
+          lot: p.lot,
+          entry: p.entry,
+          current: p.current,
+          pnl: p.pnl
+        }));
+        renderPositions();
+      }
+    }
+    if (engRes.ok) {
+      engineLive = await engRes.json();
+      const statusText = document.getElementById('statusText');
+      const statusDot = document.getElementById('statusDot');
+      const statusPing = document.getElementById('statusPing');
+      if (statusText && engineLive) {
+        const ws = engineLive.ws_connected ? 'WS متصل' : 'WS غير متصل';
+        statusText.innerText = `النظام: ${ws} | ${engineLive.last_verdict || '—'}`;
+        if (engineLive.emergency_lock || engineLive.stream_frozen) {
+          statusText.className = 'text-[11px] font-bold text-red-400/90 tracking-wide';
+          if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500';
+          if (statusPing) statusPing.classList.add('hidden');
+        }
+      }
+    }
+  } catch (_) {
+    /* offline demo */
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderSignals();
   renderPositions();
@@ -439,5 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
   startSignalCountdown();
   updateSyncClock();
   setInterval(updateSyncClock, 1000);
+  refreshFromEngineApis();
+  setInterval(refreshFromEngineApis, 3000);
   fetch('/api/health').catch(() => {});
 });

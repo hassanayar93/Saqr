@@ -1,5 +1,8 @@
+mod chrono_sync_worker;
+mod engine_launcher;
 mod gc_worker;
 mod integrations_bridge;
+mod orphan_sweep;
 mod startup_checklist;
 mod web_server;
 
@@ -8,9 +11,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use saqr_core::config::env_settings::SaqrSettings;
-use saqr_core::orchestrator::decision_cascade::DecisionCascade;
 use saqr_core::orchestrator::phase4_master_orchestrator::Phase4MasterOrchestrator;
-use saqr_core::orchestrator::sovereign_matrix::{SovereignMatrix, SovereignMatrixInputs};
 use saqr_core::telegram::anti_flood::TelegramAntiFlood;
 use tokio::sync::mpsc;
 
@@ -26,9 +27,7 @@ async fn main() -> ExitCode {
         for e in &errors {
             tracing::error!("settings validation: {e}");
         }
-        tracing::error!(
-            "Refusing to start — fix .env (see .env.example) and retry."
-        );
+        tracing::error!("Refusing to start — fix .env (see .env.example) and retry.");
         return ExitCode::from(1);
     }
 
@@ -56,26 +55,17 @@ async fn run_engine(
     tokio::spawn(gc_worker::run_gc_worker(gc_rx));
 
     let orchestrator = Phase4MasterOrchestrator::new(settings.initial_balance_usd);
-    let cascade = DecisionCascade::new();
     orchestrator.heartbeat();
 
-    let level0 = cascade.level0_macro(0, true);
-    tracing::info!("Decision cascade level0: {:?}", level0);
-
-    let matrix_ok = SovereignMatrix::commander_may_fire(SovereignMatrixInputs {
-        is_execution_safe: true,
-        macro_risk_score: 0.05,
-        momentum_consensus: 90.0,
-        sovereign_score: 92.0,
-    });
-    tracing::info!("Sovereign matrix pass={matrix_ok} mode={}", settings.mode);
+    let launched = engine_launcher::launch(settings.clone(), gc_tx.clone()).await;
 
     integrations_bridge::spawn_integrations_bridge(settings.clone(), telegram_flood);
 
     let web_root = resolve_web_root();
-    let settings_arc = settings.clone();
+    let engine = Arc::clone(&launched.runtime);
+    let settings_web = settings.clone();
     tokio::spawn(async move {
-        if let Err(e) = web_server::start_web(settings_arc, &web_root).await {
+        if let Err(e) = web_server::start_web(settings_web, engine, &web_root).await {
             tracing::error!("web server error: {e}");
         }
     });
@@ -84,7 +74,7 @@ async fn run_engine(
     orchestrator.heartbeat();
 
     tracing::info!(
-        "صقر SAQR Engine v6.0 — orchestrator running (web {}:{})",
+        "صقر SAQR Engine v6.0 — hot loop + WS active (web {}:{})",
         settings.web_bind_host,
         settings.web_bind_port
     );
