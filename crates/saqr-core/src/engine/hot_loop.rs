@@ -4,9 +4,12 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
+use crate::algorithms::cross_exchange_liquidity_matrix::CrossExchangeLiquidityMatrix;
+use crate::algorithms::dass::DassShield;
 use crate::algorithms::hira::HiraEngine;
 use crate::algorithms::mmid::MmidDetector;
 use crate::algorithms::mvrs::MvrsPredictor;
+use crate::algorithms::nlp_flash_sentiment_injector::NlpFlashSentimentInjector;
 use crate::binance::order_executor::OrderExecutor;
 use crate::conquest::selected_battalion::SelectedBattalion;
 use crate::conquest::sovereign_conquest_engine::SovereignConquestEngine;
@@ -100,9 +103,25 @@ impl HotLoopContext {
         let hidden = HiraEngine::estimate_hidden_size_scaled(state.cvd_h1_scaled / 100, 60_000_000);
         let mmid = MmidDetector::trap_score_scaled(20_000_000, 10_000_000);
         let mvrs = MvrsPredictor::entropy_burst_scaled(mmid, state.cvd_h1_scaled);
-        let sovereign_score = (consensus * 0.5)
-            + (hidden as f64 / SCALE_8 as f64 * 10.0)
-            + (mvrs as f64 / 1_000_000.0);
+        let dass_bps = DassShield::widen_margin_bps(5, mmid.saturating_add(mvrs));
+        let cross = CrossExchangeLiquidityMatrix::aggregate_depth_scaled(
+            bid_depth as i64,
+            ask_depth as i64,
+            0,
+        );
+        let sentiment = NlpFlashSentimentInjector::inject_sentiment_scaled(0);
+        if NlpFlashSentimentInjector::should_halt_trading(sentiment) {
+            self.store_verdict(CascadeVerdict::RejectLevel0);
+            self.runtime.refresh_status_snapshot();
+            return;
+        }
+        let sovereign_score = (consensus * 0.4)
+            + (hidden as f64 / SCALE_8 as f64 * 8.0)
+            + (mvrs as f64 / 1_000_000.0)
+            + (cross as f64 / SCALE_8 as f64)
+            + (sentiment as f64 / 1_000_000.0)
+            - (dass_bps as f64 / 100.0);
+        let sovereign_score = sovereign_score.clamp(0.0, 100.0);
 
         let l3 = DecisionCascade::level3_execution(consensus, sovereign_score);
         self.store_verdict(l3);
