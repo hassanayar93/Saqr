@@ -42,8 +42,14 @@ async fn status(State(st): State<AppState>) -> impl IntoResponse {
         "mode": st.settings.mode,
         "symbol": st.settings.symbol,
         "binance_testnet": st.settings.binance.testnet,
+        "binance_rest_url": st.settings.binance.rest_base_url,
+        "binance_ws_url": st.settings.binance.ws_base_url,
+        "binance_spot_web_url": st.settings.binance.spot_web_url,
+        "binance_configured": !st.settings.api_key.is_empty(),
+        "cloud_host": st.settings.cloud.host,
         "cloud_host_configured": !st.settings.cloud.host.is_empty(),
         "telegram_configured": !st.settings.telegram.bot_token.is_empty(),
         "dashboard_url": st.settings.cloud.public_dashboard_url,
+        "web_port": st.settings.web_bind_port,
     }))
 }

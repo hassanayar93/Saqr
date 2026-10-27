@@ -4,6 +4,8 @@ use std::env;
 pub struct BinanceEndpoints {
     pub rest_base_url: String,
     pub ws_base_url: String,
+    pub spot_web_url: String,
+    pub recv_window_ms: u64,
     pub testnet: bool,
 }
 
@@ -63,6 +65,11 @@ impl SaqrSettings {
             binance: BinanceEndpoints {
                 rest_base_url: rest,
                 ws_base_url: ws,
+                spot_web_url: env::var("BINANCE_SPOT_WEB_URL").unwrap_or_default(),
+                recv_window_ms: env::var("BINANCE_RECV_WINDOW")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(5000),
                 testnet,
             },
             telegram: TelegramSettings {
