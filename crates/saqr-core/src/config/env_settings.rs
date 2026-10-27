@@ -1,5 +1,7 @@
 use std::env;
 
+use super::settings_validate::sanitize_env_value;
+
 #[derive(Debug, Clone)]
 pub struct BinanceEndpoints {
     pub rest_base_url: String,
@@ -32,6 +34,10 @@ pub struct SaqrSettings {
     pub symbol: String,
     pub api_key: String,
     pub api_secret: String,
+    /// عند true: مسار التنفيذ (testnet/live) — افتراضي false في demo
+    pub enable_trading: bool,
+    /// مطلوب SAQR_ENABLE_LIVE_ACK=true قبل SAQR_MODE=live
+    pub enable_live_ack: bool,
     pub binance: BinanceEndpoints,
     pub telegram: TelegramSettings,
     pub cloud: CloudServerSettings,
@@ -57,16 +63,26 @@ impl SaqrSettings {
             }
         });
 
+        let mode = sanitize_env_value(&env::var("SAQR_MODE").unwrap_or_else(|_| "demo".into()))
+            .to_ascii_lowercase();
+
         Self {
-            mode: env::var("SAQR_MODE").unwrap_or_else(|_| "demo".into()),
+            mode,
             initial_balance_usd: env_f64("SAQR_INITIAL_BALANCE_USD", 500.0),
-            symbol: env::var("SAQR_SYMBOL").unwrap_or_else(|_| "BTCUSDT".into()),
-            api_key: env::var("BINANCE_API_KEY").unwrap_or_default(),
-            api_secret: env::var("BINANCE_API_SECRET").unwrap_or_default(),
+            symbol: sanitize_env_value(
+                &env::var("SAQR_SYMBOL").unwrap_or_else(|_| "BTCUSDT".into()),
+            )
+            .to_ascii_uppercase(),
+            api_key: env_secret("BINANCE_API_KEY"),
+            api_secret: env_secret("BINANCE_API_SECRET"),
+            enable_trading: env_bool("SAQR_ENABLE_TRADING", false),
+            enable_live_ack: env_bool("SAQR_ENABLE_LIVE_ACK", false),
             binance: BinanceEndpoints {
-                rest_base_url: rest,
-                ws_base_url: ws,
-                spot_web_url: env::var("BINANCE_SPOT_WEB_URL").unwrap_or_default(),
+                rest_base_url: sanitize_env_value(&rest),
+                ws_base_url: sanitize_env_value(&ws),
+                spot_web_url: sanitize_env_value(
+                    &env::var("BINANCE_SPOT_WEB_URL").unwrap_or_default(),
+                ),
                 recv_window_ms: env::var("BINANCE_RECV_WINDOW")
                     .ok()
                     .and_then(|v| v.parse().ok())
@@ -74,9 +90,13 @@ impl SaqrSettings {
                 testnet,
             },
             telegram: TelegramSettings {
-                bot_token: env::var("TELEGRAM_BOT_TOKEN").unwrap_or_default(),
-                chat_id: env::var("TELEGRAM_CHAT_ID").unwrap_or_default(),
-                secondary_bot_token: env::var("TELEGRAM_SECONDARY_BOT_TOKEN").ok(),
+                bot_token: env_secret("TELEGRAM_BOT_TOKEN"),
+                chat_id: sanitize_env_value(
+                    &env::var("TELEGRAM_CHAT_ID").unwrap_or_default(),
+                ),
+                secondary_bot_token: env::var("TELEGRAM_SECONDARY_BOT_TOKEN")
+                    .ok()
+                    .map(|v| env_secret_raw(&v)),
             },
             cloud: CloudServerSettings {
                 host: env::var("CLOUD_SERVER_HOST").unwrap_or_default(),
@@ -110,4 +130,14 @@ fn env_u16(key: &str, default: u16) -> u16 {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
+}
+
+fn env_secret(key: &str) -> String {
+    env::var(key)
+        .map(|v| env_secret_raw(&v))
+        .unwrap_or_default()
+}
+
+fn env_secret_raw(raw: &str) -> String {
+    sanitize_env_value(raw)
 }

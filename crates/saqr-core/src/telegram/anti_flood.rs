@@ -27,6 +27,28 @@ impl TelegramAntiFlood {
 
     pub fn reset_on_success(&self) {
         self.backoff_ms.store(1000, Ordering::Release);
+        self.last_error_ms.store(0, Ordering::Release);
+    }
+
+    /// المدة المتبقية قبل السماح بإرسال جديد بعد Flood (0 = جاهز).
+    pub fn gate_delay_ms(&self, now_ms: u64) -> u64 {
+        let last = self.last_error_ms.load(Ordering::Acquire);
+        if last == 0 {
+            return 0;
+        }
+        let wait = self.wait_ms();
+        let elapsed = now_ms.saturating_sub(last);
+        if elapsed >= wait {
+            0
+        } else {
+            wait - elapsed
+        }
+    }
+
+    pub fn note_http_rate_limited(&self, now_ms: u64, status: u16) {
+        if status == 429 {
+            self.on_rate_limited(now_ms);
+        }
     }
 }
 

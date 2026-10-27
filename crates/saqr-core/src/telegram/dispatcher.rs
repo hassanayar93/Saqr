@@ -33,4 +33,8 @@ impl TelegramDispatcher {
     pub fn default_chat_id(&self) -> &str {
         &self.settings.chat_id
     }
+
+    pub fn bot_token(&self) -> &str {
+        &self.settings.bot_token
+    }
 }
