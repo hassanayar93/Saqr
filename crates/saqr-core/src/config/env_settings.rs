@@ -21,6 +21,7 @@ pub struct CloudServerSettings {
     pub host: String,
     pub port: u16,
     pub ssh_user: String,
+    pub password: String,
     pub public_dashboard_url: String,
 }
 
@@ -81,6 +82,7 @@ impl SaqrSettings {
                 host: env::var("CLOUD_SERVER_HOST").unwrap_or_default(),
                 port: env_u16("CLOUD_SERVER_PORT", 22),
                 ssh_user: env::var("CLOUD_SERVER_SSH_USER").unwrap_or_default(),
+                password: env::var("CLOUD_SERVER_PASSWORD").unwrap_or_default(),
                 public_dashboard_url: env::var("SAQR_PUBLIC_DASHBOARD_URL").unwrap_or_default(),
             },
             web_bind_host: env::var("SAQR_WEB_BIND_HOST").unwrap_or_else(|_| "0.0.0.0".into()),
