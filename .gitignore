@@ -2,12 +2,11 @@
 .venv/
 venv/
 __pycache__/
+target/
 *.py[cod]
 *.log
 logs/
 data/
-.pytest_cache/
-.mypy_cache/
 .idea/
 .vscode/
 *.egg-info/

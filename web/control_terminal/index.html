@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAQR | صقر - Control Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Inter:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { 100: '#FDF8E1', 300: '#E6C875', 400: '#D4AF37', 500: '#C59B27', 600: '#9A781C', dark: '#4A3B0F' }
+          },
+          fontFamily: { cairo: ['Cairo', 'sans-serif'], num: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Cairo', sans-serif; background-color: #07090e; color: #d1d5db; font-weight: 600; overflow-x: hidden; }
+    .glass { background: rgba(15, 20, 30, 0.85); border: 1px solid rgba(212, 175, 55, 0.25); backdrop-filter: blur(8px); }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <header class="flex flex-wrap items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-3xl md:text-4xl font-black text-gold-400">صقر <span class="text-gray-400 text-xl">SAQR v6.0</span></h1>
+      <p class="text-sm text-gray-500 mt-1">Control Terminal — SSCCC Sovereign Matrix</p>
+    </div>
+    <div id="health-badge" class="glass px-4 py-2 rounded-xl text-gold-300"><i class="fa-solid fa-satellite-dish ml-2"></i>جاري الاتصال...</div>
+  </header>
+
+  <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="glass rounded-2xl p-6 lg:col-span-2">
+      <h2 class="text-xl text-gold-400 mb-4"><i class="fa-solid fa-layer-group ml-2"></i>شجرة القرار</h2>
+      <ol class="space-y-3 text-sm leading-relaxed">
+        <li><span class="text-gold-500">L0</span> — ماكرو + Local Weight Bucket + BTC Circuit Breaker</li>
+        <li><span class="text-gold-500">L1</span> — كتيبة واحدة Consensus ≥ 90% + Dynamic Kelly ≤ 3%</li>
+        <li><span class="text-gold-500">L2</span> — عمق Top-3 ≥ 5× + ChronoGuard</li>
+        <li><span class="text-gold-500">L3</span> — FOK/IOC + خروج L2/CVD</li>
+      </ol>
+    </section>
+
+    <section class="glass rounded-2xl p-6">
+      <h2 class="text-xl text-gold-400 mb-4"><i class="fa-brands fa-telegram ml-2"></i>حالة الربط</h2>
+      <ul id="status-list" class="space-y-2 text-sm font-num"></ul>
+    </section>
+
+    <section class="glass rounded-2xl p-6 lg:col-span-3">
+      <h2 class="text-xl text-gold-400 mb-2"><i class="fa-solid fa-server ml-2"></i>إعداداتك في `.env`</h2>
+      <p class="text-gray-400 text-sm">أضف مفاتيح Binance وTelegram و<code class="text-gold-300">CLOUD_SERVER_*</code> و<code class="text-gold-300">SAQR_PUBLIC_DASHBOARD_URL</code> ثم أعد تشغيل <code class="text-gold-300">saqr</code>.</p>
+    </section>
+  </main>
+
+  <script>
+    async function refresh() {
+      try {
+        const h = await fetch('/api/health').then(r => r.json());
+        document.getElementById('health-badge').innerHTML = '<i class="fa-solid fa-circle-check ml-2 text-emerald-400"></i>' + (h.engine || 'SAQR');
+        const s = await fetch('/api/status').then(r => r.json());
+        document.getElementById('status-list').innerHTML = `
+          <li>Mode: <span class="text-gold-300">${s.mode}</span></li>
+          <li>Symbol: <span class="text-gold-300">${s.symbol}</span></li>
+          <li>Testnet: <span class="text-gold-300">${s.binance_testnet}</span></li>
+          <li>Telegram: <span class="text-gold-300">${s.telegram_configured ? 'configured' : 'pending'}</span></li>
+          <li>Cloud: <span class="text-gold-300">${s.cloud_host_configured ? 'configured' : 'pending'}</span></li>
+          <li>Dashboard URL: <span class="text-gold-300">${s.dashboard_url || '—'}</span></li>`;
+      } catch (e) {
+        document.getElementById('health-badge').textContent = 'غير متصل — شغّل saqr-cli';
+      }
+    }
+    refresh();
+    setInterval(refresh, 15000);
+  </script>
+</body>
+</html>

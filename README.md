@@ -1,36 +1,22 @@
-# صقر (Saqr)
+# صقر — SAQR Engine v6.0
 
-بوت تداول لمنصة **Binance** — مشروع مستقل عن GoldenShield AI.
+محرك تداول **Binance** (Rust) — مستودع مستقل على **hassanayar93/Saqr**.
 
-## الوضع الافتراضي
+## الوثائق
 
-- **`SAQR_MODE=demo`**: تشغيل بدون مفاتيح API (آمن للتجربة).
-- **`testnet`**: عند `SAQR_MODE=testnet` مع `BINANCE_TESTNET=true` يستخدم Testnet Spot.
-- **`live`**: تداول حقيقي — استخدمه فقط بعد ضبط المخاطر والمفاتيح.
+- **[الفهرس.md](./الفهرس.md)** — شجرة الملفات واختصاص كل ملف
+- **[دليل صقر.md](./دليل%20صقر.md)** — شرح ما تم برمجته
 
-## التثبيت
+## تشغيل سريع
 
 ```bash
-cd saqr
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
 cp .env.example .env
+# عدّل .env (Binance, Telegram, Cloud)
+cargo run --release --bin saqr
 ```
 
-## التشغيل
+لوحة التحكم: `http://127.0.0.1:8787`
 
-```bash
-python main.py --once
-python main.py --cycles 3
-python main.py
-```
+## Demo افتراضي
 
-## GitHub
-
-المستودع المستهدف: حساب **[hassanayar93](https://github.com/hassanayar93)** (ليس `goldenshield-ai`).
-
-## أمان
-
-- لا ترفع `.env` أو مفاتيح API.
-- Demo/Testnet افتراضياً حتى تفعيل Live صراحة.
+`SAQR_MODE=demo` — لا live trading حتى تغيّر الإعدادات صراحة.
