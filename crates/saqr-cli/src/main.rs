@@ -1,4 +1,5 @@
 mod gc_worker;
+mod integrations_bridge;
 mod web_server;
 
 use std::path::PathBuf;
@@ -35,6 +36,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sovereign_score: 92.0,
     });
     tracing::info!("Sovereign matrix pass={matrix_ok} mode={}", settings.mode);
+
+    integrations_bridge::spawn_integrations_bridge(settings.clone());
 
     let web_root = resolve_web_root();
     let settings_arc = settings.clone();
