@@ -2,10 +2,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-VERSION="${1:-6.0.1}"
+VERSION="${1:-6.0.2}"
 OUT="$ROOT/dist/Saqr-Windows-Home-v${VERSION}"
 ZIP="$ROOT/dist/Saqr-Windows-Home-v${VERSION}.zip"
 
+python3 scripts/fix-bat-crlf.py
 echo "Building Windows GNU target..."
 cargo build --release -p saqr-cli --target x86_64-pc-windows-gnu
 
@@ -19,6 +20,8 @@ cp deploy/windows-local/README_AR.md "$OUT/اقرأني.txt"
 cp deploy/windows-local/START_SAQR.bat "$OUT/START_SAQR.bat"
 cp deploy/windows-local/OPEN_DASHBOARD.bat "$OUT/OPEN_DASHBOARD.bat"
 cp deploy/windows-local/CREATE_ENV.bat "$OUT/CREATE_ENV.bat"
+cp deploy/windows-local/START_SAQR.ps1 "$OUT/START_SAQR.ps1"
+python3 scripts/fix-bat-crlf.py "$OUT"
 
 cd "$ROOT/dist"
 rm -f "$ZIP"

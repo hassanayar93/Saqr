@@ -1,2 +1,2 @@
 @echo off
-start "" "http://127.0.0.1:8787"
+start http://127.0.0.1:8787
