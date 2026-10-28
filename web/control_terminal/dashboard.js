@@ -261,6 +261,10 @@ function startSignalCountdown() {
 }
 
 function refreshSignals(isManual = false) {
+  if (engineLive && engineLive.ws_connected) {
+    refreshFromEngineApis();
+    return;
+  }
   const icon = document.getElementById('refreshIcon');
   if (icon) icon.classList.add('fa-spin');
   const pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'AVAX/USDT'];
@@ -459,11 +463,30 @@ async function refreshFromEngineApis() {
     }
     if (statusRes.ok) {
       const st = await statusRes.json();
+      const balEl = document.getElementById('totalBalance');
+      const pctEl = document.getElementById('dailyProfitPct');
+      if (balEl && st.initial_balance_usd != null) {
+        balEl.innerText = `${Number(st.initial_balance_usd).toLocaleString('en-US', { minimumFractionDigits: 2 })} $`;
+      }
+      if (pctEl) {
+        const mode = st.mode || 'demo';
+        const tr = st.enable_trading ? 'تداول ON' : 'تداول OFF';
+        pctEl.innerText = `${mode} · ${tr}`;
+        pctEl.className = 'text-[11px] font-num font-bold text-gold-400/90 mt-0.5';
+      }
+      const posCnt = document.getElementById('activePositionsCount');
+      if (posCnt && openPositions) posCnt.innerText = String(openPositions.length);
       if (st.binance_live_price > 0) {
         const liq = document.getElementById('liquidityList');
         if (liq && st.symbol) {
-          liquidityPairs = [{ pair: st.symbol.replace('USDT', ' / USDT'), volume: st.binance_live_price }];
+          const sym = st.symbol.endsWith('USDT')
+            ? st.symbol.replace('USDT', ' / USDT')
+            : st.symbol;
+          liquidityPairs = [{ pair: sym, volume: st.binance_live_price }];
           renderLiquidity();
+        }
+        if (pctEl && engineLive && engineLive.ws_connected) {
+          pctEl.innerText = `${Number(st.binance_live_price).toFixed(2)} USDT`;
         }
       }
     }

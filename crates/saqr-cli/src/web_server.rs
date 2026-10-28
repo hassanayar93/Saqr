@@ -67,6 +67,9 @@ async fn status(State(st): State<AppState>) -> impl IntoResponse {
         "dashboard_url": st.settings.cloud.public_dashboard_url,
         "web_port": st.settings.web_bind_port,
         "enable_trading": st.settings.enable_trading,
+        "initial_balance_usd": st.settings.initial_balance_usd,
+        "signal_count": st.engine.signals.read().len(),
+        "last_verdict": eng.last_verdict,
     }))
 }
 

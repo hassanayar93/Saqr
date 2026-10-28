@@ -21,6 +21,7 @@ cp -a web/control_terminal/. "$OUT/web/control_terminal/"
 cp "$LAUNCH"/SAQR_RUN.bat "$LAUNCH"/SAQR_RUN.ps1 "$OUT/"
 cp "$LAUNCH"/SAQR_DIAGNOSE.bat "$LAUNCH"/SAQR_DIAGNOSE.ps1 "$OUT/"
 cp "$LAUNCH"/FIX_MY_ENV.bat "$LAUNCH"/FIX_MY_ENV.ps1 "$OUT/"
+cp "$LAUNCH"/OPEN_DASHBOARD.bat "$LAUNCH"/OPEN_DASHBOARD.ps1 "$OUT/"
 cp "$LAUNCH"/env.template "$OUT/env.template"
 cp "$LAUNCH"/دليل_التشغيل_من_الألف_للياء.md "$OUT/دليل_التشغيل.md"
 cat > "$OUT/ابدأ_هنا.txt" <<'EOF'
@@ -34,7 +35,7 @@ cat > "$OUT/ابدأ_هنا.txt" <<'EOF'
 5) إن فشل التحقق: FIX_MY_ENV.bat ثم SAQR_RUN.bat مرة أخرى
 6) تشخيص: SAQR_DIAGNOSE.bat
 
-اللوحة: http://127.0.0.1:8787
+اللوحة: OPEN_DASHBOARD.bat (بعد تشغيل SAQR_RUN)
 إيقاف البوت: Ctrl+C
 
 التفاصيل: دليل_التشغيل.md
