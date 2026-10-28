@@ -43,6 +43,8 @@ pub struct SaqrSettings {
     pub cloud: CloudServerSettings,
     pub web_bind_host: String,
     pub web_bind_port: u16,
+    /// demo: ي require Telegram + Binance testnet URLs للتكامل الكامل
+    pub require_integrated_demo: bool,
 }
 
 impl SaqrSettings {
@@ -105,8 +107,9 @@ impl SaqrSettings {
                 password: env::var("CLOUD_SERVER_PASSWORD").unwrap_or_default(),
                 public_dashboard_url: env::var("SAQR_PUBLIC_DASHBOARD_URL").unwrap_or_default(),
             },
-            web_bind_host: env::var("SAQR_WEB_BIND_HOST").unwrap_or_else(|_| "0.0.0.0".into()),
+            web_bind_host: env::var("SAQR_WEB_BIND_HOST").unwrap_or_else(|_| "127.0.0.1".into()),
             web_bind_port: env_u16("SAQR_WEB_BIND_PORT", 8787),
+            require_integrated_demo: env_bool("SAQR_REQUIRE_INTEGRATED_DEMO", true),
         }
     }
 }

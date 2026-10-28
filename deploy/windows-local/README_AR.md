@@ -5,11 +5,14 @@
 ## الطريقة 1 — حزمة جاهزة (موصى بها)
 
 1. افتح: https://github.com/hassanayar93/Saqr/releases  
-2. حمّل أحدث ملف **`Saqr-Windows-Home-*.zip`**.  
-3. فك الضغط في مجلد قصير، مثلاً: `C:\Saqr`  
-4. انسخ `env.template` إلى `.env` وعبّئ Binance / Telegram.  
-5. شغّل **`START_SAQR.bat`** (نقر مزدوج).  
-6. افتح المتصفح: http://127.0.0.1:8787  
+2. حمّل **`Saqr-Windows-Home-v6.0.1.zip`** (أحدث).  
+3. فك الضغط في `C:\Saqr`  
+4. شغّل **`CREATE_ENV.bat`** أو انسخ `env.template` → `.env`  
+5. عبّئ **Telegram** (مطلوب) + **Binance Testnet** (مفاتiح اختيارية للأسعار الحية في demo)  
+6. **`START_SAQR.bat`** — إن فشل، افتح `logs\saqr-last-run.log`  
+7. **`OPEN_DASHBOARD.bat`** → http://127.0.0.1:8787  
+
+**Demo متكامل:** Binance Testnet حقيقي (WS + REST) + Telegram + لوحة — **بدون أوامر** (`SAQR_ENABLE_TRADING=false`).
 
 ## الطريقة 2 — بناء من المصدر على جهازك
 

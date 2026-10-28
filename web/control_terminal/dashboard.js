@@ -15,11 +15,7 @@ let liquidityPairs = [
   { pair: 'BNB / USDT', volume: 4.1 }
 ];
 
-let tradeHistory = [
-  { pair: 'BTC / USDT', type: 'BUY', lot: '0.15', entry: 64250, exit: 65120, pnl: 210.00, day: 'السبت', time: '02:20:11 م' },
-  { pair: 'SOL / USDT', type: 'SELL', lot: '0.50', entry: 145.20, exit: 142.10, pnl: 85.50, day: 'السبت', time: '11:10:45 ص' },
-  { pair: 'ETH / USDT', type: 'BUY', lot: '1.00', entry: 3480, exit: 3465, pnl: -15.00, day: 'الجمعة', time: '10:05:00 م' }
-];
+let tradeHistory = [];
 
 let signals = [];
 let engineLive = null;
@@ -424,10 +420,11 @@ function updateSyncClock() {
 
 async function refreshFromEngineApis() {
   try {
-    const [sigRes, posRes, engRes] = await Promise.all([
+    const [sigRes, posRes, engRes, statusRes] = await Promise.all([
       fetch('/api/signals'),
       fetch('/api/positions'),
-      fetch('/api/engine')
+      fetch('/api/engine'),
+      fetch('/api/status')
     ]);
     if (sigRes.ok) {
       const sigJson = await sigRes.json();
@@ -458,6 +455,16 @@ async function refreshFromEngineApis() {
           pnl: p.pnl
         }));
         renderPositions();
+      }
+    }
+    if (statusRes.ok) {
+      const st = await statusRes.json();
+      if (st.binance_live_price > 0) {
+        const liq = document.getElementById('liquidityList');
+        if (liq && st.symbol) {
+          liquidityPairs = [{ pair: st.symbol.replace('USDT', ' / USDT'), volume: st.binance_live_price }];
+          renderLiquidity();
+        }
       }
     }
     if (engRes.ok) {

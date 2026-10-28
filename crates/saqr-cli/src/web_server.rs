@@ -48,10 +48,15 @@ async fn health() -> impl IntoResponse {
 }
 
 async fn status(State(st): State<AppState>) -> impl IntoResponse {
+    st.engine.refresh_status_snapshot();
+    let eng = st.engine.status.read().clone();
     Json(serde_json::json!({
         "mode": st.settings.mode,
         "symbol": st.settings.symbol,
         "binance_testnet": st.settings.binance.testnet,
+        "binance_live_price": eng.last_price,
+        "ws_connected": eng.ws_connected,
+        "integration": "binance_testnet_real + telegram + dashboard",
         "binance_rest_url": st.settings.binance.rest_base_url,
         "binance_ws_url": st.settings.binance.ws_base_url,
         "binance_spot_web_url": st.settings.binance.spot_web_url,

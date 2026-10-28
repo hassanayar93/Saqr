@@ -10,27 +10,35 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-gnu
-
-      - name: Install mingw
-        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 zip
-
-      - name: Build bundle
-        run: bash scripts/build-windows-home-bundle.sh "${GITHUB_REF_NAME#v}"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Build release exe
+        run: cargo build --release -p saqr-cli
+      - name: Assemble bundle folder
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v',''
+          if (-not $v) { $v = "6.0.1" }
+          $out = "dist/Saqr-Windows-Home-v$v"
+          New-Item -ItemType Directory -Force -Path "$out/bin","$out/web/control_terminal","$out/logs" | Out-Null
+          Copy-Item target/release/saqr.exe "$out/bin/"
+          Copy-Item -Recurse web/control_terminal/* "$out/web/control_terminal/"
+          Copy-Item deploy/windows-local/env.template "$out/"
+          Copy-Item deploy/windows-local/*.bat "$out/"
+          Copy-Item deploy/windows-local/README_AR.md "$out/اقرأني.txt"
+      - name: Zip
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v',''
+          if (-not $v) { $v = "6.0.1" }
+          Compress-Archive -Path "dist/Saqr-Windows-Home-v$v" -DestinationPath "dist/Saqr-Windows-Home-v$v.zip" -Force
+      - uses: actions/upload-artifact@v4
         with:
           name: Saqr-Windows-Home
           path: dist/Saqr-Windows-Home-*.zip
-
       - name: GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2

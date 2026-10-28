@@ -39,6 +39,10 @@ pub enum SettingsValidationError {
     TradingFlagModeMismatch,
     #[error("SAQR_WEB_BIND_PORT must be 1–65535")]
     InvalidWebPort,
+    #[error("integrated demo requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")]
+    IntegratedDemoNeedsTelegram,
+    #[error("integrated demo requires BINANCE_TESTNET=true (Testnet URLs)")]
+    IntegratedDemoNeedsTestnet,
 }
 
 impl SaqrSettings {
@@ -109,6 +113,15 @@ impl SaqrSettings {
         let tg_chat = self.telegram.chat_id.is_empty();
         if tg_token ^ tg_chat {
             errors.push(SettingsValidationError::TelegramPartialConfig);
+        }
+
+        if mode == "demo" && self.require_integrated_demo {
+            if tg_token || tg_chat {
+                errors.push(SettingsValidationError::IntegratedDemoNeedsTelegram);
+            }
+            if !self.binance.testnet {
+                errors.push(SettingsValidationError::IntegratedDemoNeedsTestnet);
+            }
         }
         if !tg_token {
             if had_untrimmed_secret("TELEGRAM_BOT_TOKEN") {
@@ -210,6 +223,7 @@ mod tests {
             },
             web_bind_host: "127.0.0.1".into(),
             web_bind_port: 8787,
+            require_integrated_demo: false,
         }
     }
 
@@ -218,6 +232,7 @@ mod tests {
         let mut s = base_settings("demo");
         s.api_key.clear();
         s.api_secret.clear();
+        s.require_integrated_demo = false;
         assert!(s.validate().is_ok());
     }
 

@@ -1,7 +1,7 @@
 mod chrono_sync_worker;
 mod engine_launcher;
 mod gc_worker;
-mod integrations_bridge;
+mod unified_integrations;
 mod orphan_sweep;
 mod startup_checklist;
 mod web_server;
@@ -59,7 +59,11 @@ async fn run_engine(
 
     let launched = engine_launcher::launch(settings.clone(), gc_tx.clone()).await;
 
-    integrations_bridge::spawn_integrations_bridge(settings.clone(), telegram_flood);
+    unified_integrations::spawn_unified_integrations(
+        settings.clone(),
+        telegram_flood,
+        Arc::clone(&launched.runtime),
+    );
 
     let web_root = resolve_web_root();
     let engine = Arc::clone(&launched.runtime);
