@@ -1,136 +1,89 @@
-let isRunning = true;
+/** SAQR Control Terminal — مرآة حية فقط (محرك + Binance). لا Math.random ولا صفقات وهمية. */
 let alertActive = true;
 let calcEnabled = false;
-let currentReportPeriod = 'daily';
-const SIGNAL_REFRESH_INTERVAL = 4;
-let signalTimerSeconds = SIGNAL_REFRESH_INTERVAL;
-let countdownTimer = null;
+const API_POLL_MS = 3000;
 
 let openPositions = [];
-
-let liquidityPairs = [
-  { pair: 'BTC / USDT', volume: 34.2 },
-  { pair: 'ETH / USDT', volume: 18.5 },
-  { pair: 'SOL / USDT', volume: 6.8 },
-  { pair: 'BNB / USDT', volume: 4.1 }
-];
-
+let liquidityPairs = [];
 let tradeHistory = [];
-
 let signals = [];
 let engineLive = null;
+let mirrorLive = null;
+const READ_ONLY = true;
 
 function showToast(msg) {
   const toast = document.getElementById('toast');
   const toastMsg = document.getElementById('toastMsg');
   if (!toast || !toastMsg) return;
   toastMsg.innerText = msg;
-  toast.classList.remove('opacity-0', 'pointer-events-none');
-  toast.classList.add('opacity-100');
-  setTimeout(() => {
-    toast.classList.remove('opacity-100');
-    toast.classList.add('opacity-0', 'pointer-events-none');
-  }, 2300);
+  toast.classList.remove('hidden');
+  setTimeout(() => toast.classList.add('hidden'), 2800);
 }
 
 function toggleAccordion(id) {
-  const content = document.getElementById(id);
+  const sec = document.getElementById(id);
   const icon = document.getElementById(`${id}-icon`);
-  if (!content) return;
-  const isOpen = content.classList.contains('open');
-  if (isOpen) {
-    content.classList.remove('open');
-    if (icon) icon.classList.remove('rotate-180');
-  } else {
-    content.classList.add('open');
-    if (icon) icon.classList.add('rotate-180');
-  }
+  if (!sec) return;
+  sec.classList.toggle('open');
+  if (icon) icon.style.transform = sec.classList.contains('open') ? 'rotate(180deg)' : '';
 }
 
+function readOnlyAction(label) {
+  showToast(`اللوحة للعرض فقط — ${label} من Binance Testnet أو المحرك`);
+}
+
+function closeWinningTrades() {
+  readOnlyAction('إغلاق الصفقات');
+}
+function closeLosingTrades() {
+  readOnlyAction('إغلاق الصفقات');
+}
+function partialClosePosition() {
+  readOnlyAction('تعديل الصفقات');
+}
+function closePosition() {
+  readOnlyAction('إغلاق الصفقات');
+}
+
+function selectReport() {
+  showToast('التقارير: من سجل المحرك لاحقاً — لا أرقام تجريبية');
+}
+function setReportPeriod() {
+  selectReport();
+}
 function toggleCalculatorPower() {
-  calcEnabled = !calcEnabled;
-  const btn = document.getElementById('calcPowerBtn');
-  const icon = document.getElementById('calcPowerIcon');
-  const text = document.getElementById('calcPowerText');
-  const capInput = document.getElementById('calcCapital');
-  const riskInput = document.getElementById('calcRisk');
-  const calcBtn = document.getElementById('calcBtn');
-  if (calcEnabled) {
-    btn.className = 'bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-500/30 text-emerald-400/90 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-sm';
-    icon.className = 'fa-solid fa-power-off text-[9px]';
-    text.innerText = 'يعمل (مفعل)';
-    capInput.disabled = false;
-    capInput.value = '500.00';
-    capInput.className = 'w-full bg-[#0d111a] border border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-200 font-num text-xs';
-    riskInput.disabled = false;
-    riskInput.value = '2.00';
-    riskInput.className = 'w-full bg-[#0d111a] border border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-200 font-num text-xs';
-    calcBtn.disabled = false;
-    calcBtn.className = 'w-full bg-purple-700/80 hover:bg-purple-600/80 text-white py-2 rounded-lg font-bold text-[11px] shadow transition-all active:scale-95 cursor-pointer';
-    document.getElementById('calcResult').innerText = 'الحاسبة جاهزة للحساب بمعامل كيلي الديناميكي ومخاطرة ATR.';
-    showToast('تم تفعيل حاسبة العقود بنجاح 🧮');
-  } else {
-    btn.className = 'bg-rose-950/40 hover:bg-rose-900/40 border border-rose-500/30 text-rose-400/90 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-sm';
-    icon.className = 'fa-solid fa-power-off text-[9px]';
-    text.innerText = 'متوقف (غير مفعل)';
-    capInput.disabled = true;
-    capInput.value = '0.00';
-    capInput.className = 'w-full bg-[#0d111a] border border-gray-800 rounded-lg px-2.5 py-1.5 text-gray-500 font-num text-xs opacity-60';
-    riskInput.disabled = true;
-    riskInput.value = '0.00';
-    riskInput.className = 'w-full bg-[#0d111a] border border-gray-800 rounded-lg px-2.5 py-1.5 text-gray-500 font-num text-xs opacity-60';
-    calcBtn.disabled = true;
-    calcBtn.className = 'w-full bg-gray-800 text-gray-500 py-2 rounded-lg font-bold text-[11px] cursor-not-allowed shadow';
-    document.getElementById('calcResult').innerText = 'الحاسبة معطلة ومصفرة بالكامل. قم بتفعيل الزر لأداء الحسابات.';
-    showToast('تم إيقاف حاسبة العقود');
-  }
+  readOnlyAction('حاسبة الكelly');
 }
-
 function calculateLotSize() {
-  if (!calcEnabled) return;
-  const cap = parseFloat(document.getElementById('calcCapital').value) || 0;
-  const riskPct = parseFloat(document.getElementById('calcRisk').value) || 0;
-  const p = 0.68;
-  const b = 2.0;
-  const q = 1.0 - p;
-  const rawKelly = (b * p - q) / b;
-  const fractionalKelly = rawKelly * 0.30;
-  const volatilityScalar = Math.min(Math.max(0.015 / 0.008, 0.4), 1.2);
-  let calculatedRiskFraction = (riskPct / 100.0) * fractionalKelly * volatilityScalar;
-  if (calculatedRiskFraction > 0.03) calculatedRiskFraction = 0.03;
-  const recommendedLot = ((cap * calculatedRiskFraction) / 100).toFixed(2);
-  document.getElementById('calcResult').innerText = `العقد الموصى به (معامل كيلي الديناميكي): ${recommendedLot} لوت`;
-  showToast('تم حساب حجم العقد بناءً على دستور كيلي الديناميكي 🧮');
+  readOnlyAction('حاسبة العقد');
+}
+function toggleBotState() {
+  showToast('إيقاف/تشغيل البوت من نافذة SAQR_RUN (Ctrl+C) — اللوحة للعرض');
+}
+function emergencyCloseAll() {
+  readOnlyAction('الإغلاق الطارئ');
 }
 
-function setReportPeriod(period) {
-  currentReportPeriod = period;
-  const btnD = document.getElementById('btnDaily');
-  const btnW = document.getElementById('btnWeekly');
-  const btnM = document.getElementById('btnMonthly');
-  const base = 'px-2.5 py-1 rounded-md text-[10px] font-bold text-gray-400 hover:text-white transition-all';
-  btnD.className = base;
-  btnW.className = base;
-  btnM.className = base;
-  if (period === 'daily') {
-    btnD.className = 'px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-600 text-white transition-all shadow-sm';
-    document.getElementById('repWinAmt').innerText = '+183.43 $';
-    document.getElementById('repWinCount').innerText = '4 صفقات';
-    document.getElementById('repLossCount').innerText = '0 صفقات';
-    showToast('تم اختيار التقرير اليومي');
-  } else if (period === 'weekly') {
-    btnW.className = 'px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-600 text-white transition-all shadow-sm';
-    document.getElementById('repWinAmt').innerText = '+45.00 $';
-    document.getElementById('repWinCount').innerText = '24 صفقة';
-    document.getElementById('repLossCount').innerText = '2 صفقة';
-    showToast('تم اختيار التقرير الأسبوعي');
-  } else {
-    btnM.className = 'px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-600 text-white transition-all shadow-sm';
-    document.getElementById('repWinAmt').innerText = '+120.00 $';
-    document.getElementById('repWinCount').innerText = '114 صفقة';
-    document.getElementById('repLossCount').innerText = '5 صفقات';
-    showToast('تم اختيار التقرير الشهري');
+function renderSignals() {
+  const container = document.getElementById('signalsList');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!signals.length) {
+    container.innerHTML =
+      '<div class="text-center text-xs text-gray-400 font-medium py-3">لا إشارات مسجّلة من المحرك — انتظر Pass كامل أو راجع Verdict</div>';
+    return;
   }
+  signals.forEach((sig) => {
+    const el = document.createElement('div');
+    el.className = 'bg-[#121724]/90 p-2.5 rounded-xl border border-gray-800/60';
+    el.innerHTML = `
+      <div class="flex justify-between items-center">
+        <span class="font-bold text-xs text-gray-200">${sig.pair}</span>
+        <span class="text-[10px] font-num text-gold-400/90">${sig.direction} · ${sig.strengthScore}/100</span>
+      </div>
+      <div class="text-[10px] text-gray-400 mt-1">Sovereign: ${sig.rsi} | ${sig.executed ? 'نُفّذ' : 'لم يُنفّذ'}</div>`;
+    container.appendChild(el);
+  });
 }
 
 function renderPositions() {
@@ -140,36 +93,29 @@ function renderPositions() {
   let totalWinning = 0;
   let totalLosing = 0;
   if (openPositions.length === 0) {
-    container.innerHTML = '<div class="text-center text-xs text-gray-400 font-medium py-2">لا توجد صفقات مفتوحة حالياً</div>';
+    container.innerHTML =
+      '<div class="text-center text-xs text-gray-400 font-medium py-3">لا صفقات — المحرك لم ينفّذ (أو SAQR_ENABLE_TRADING=false)</div>';
     document.getElementById('winningPnlVal').innerText = '+0.00 $';
     document.getElementById('losingPnlVal').innerText = '-0.00 $';
     document.getElementById('activePositionsCount').innerText = '0';
     return;
   }
-  openPositions.forEach(pos => {
+  openPositions.forEach((pos) => {
     const isProfitable = pos.pnl >= 0;
     if (isProfitable) totalWinning += pos.pnl;
     else totalLosing += Math.abs(pos.pnl);
     const item = document.createElement('div');
-    item.className = 'bg-[#121724]/90 p-2.5 rounded-xl border border-gray-800/60 flex items-center justify-between';
-    const closeBtnClass = isProfitable
-      ? 'bg-emerald-700/80 hover:bg-emerald-600/80 border-emerald-600/40 text-white'
-      : 'bg-rose-700/80 hover:bg-rose-600/80 border-rose-600/40 text-white';
+    item.className =
+      'bg-[#121724]/90 p-2.5 rounded-xl border border-gray-800/60 flex items-center justify-between';
     item.innerHTML = `
       <div>
         <div class="flex items-center gap-1.5">
           <span class="font-bold text-xs text-gray-200">${pos.pair}</span>
-          <span class="text-[10px] text-emerald-400/90 bg-emerald-950/60 px-1.5 py-0.5 rounded font-num font-medium">${pos.type} ${pos.lot}</span>
           <span class="text-[10px] font-num font-bold ${isProfitable ? 'text-emerald-400/90' : 'text-rose-400/90'}">${isProfitable ? '+' : ''}${pos.pnl.toFixed(2)} $</span>
         </div>
-        <div class="text-[10px] text-gray-400 mt-1 font-medium">دخول: ${pos.entry.toLocaleString()} | الحالي: ${pos.current.toLocaleString()}</div>
+        <div class="text-[10px] text-gray-400 mt-1">دخول: ${pos.entry} | حالي: ${pos.current}</div>
       </div>
-      <div class="flex items-center gap-1.5">
-        <button type="button" data-partial="${pos.id}" class="text-[10px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 px-2 py-1 rounded-lg border border-amber-500/30 font-bold flex items-center gap-1 transition-all active:scale-95 shadow-sm"><span>50%</span><span class="text-amber-400/80 font-medium">×</span></button>
-        <button type="button" data-close="${pos.id}" class="text-[10px] ${closeBtnClass} px-2.5 py-1 rounded-lg border font-bold transition-all active:scale-95 shadow-sm">إغلاق</button>
-      </div>`;
-    item.querySelector('[data-partial]').onclick = () => partialClosePosition(pos.id);
-    item.querySelector('[data-close]').onclick = () => closePosition(pos.id);
+      <span class="text-[10px] text-gray-500">مرآة</span>`;
     container.appendChild(item);
   });
   document.getElementById('winningPnlVal').innerText = `+${totalWinning.toFixed(2)} $`;
@@ -177,43 +123,19 @@ function renderPositions() {
   document.getElementById('activePositionsCount').innerText = String(openPositions.length);
 }
 
-function partialClosePosition(id) {
-  const pos = openPositions.find(p => p.id === id);
-  if (!pos) return;
-  pos.lot = (parseFloat(pos.lot) / 2).toFixed(2);
-  pos.pnl = pos.pnl / 2;
-  renderPositions();
-  showToast(`تم إغلاق 50% من صفقة ${pos.pair}`);
-}
-
-function closePosition(id) {
-  openPositions = openPositions.filter(p => p.id !== id);
-  renderPositions();
-  showToast('تم إغلاق الصفقة بالكامل');
-}
-
-function closeWinningTrades() {
-  openPositions = openPositions.filter(p => p.pnl < 0);
-  renderPositions();
-  showToast('تم إغلاق الصفقات الرابحة وتحصين الأرباح بنجاح 💰');
-}
-
-function closeLosingTrades() {
-  const initialLen = openPositions.length;
-  openPositions = openPositions.filter(p => p.pnl >= 0);
-  renderPositions();
-  if (openPositions.length === initialLen) showToast('لا توجد صفقات خاسرة لإغلاقها');
-  else showToast('تم إغلاق الصفقات الخاسرة بنجاح');
-}
-
 function renderLiquidity() {
   const container = document.getElementById('liquidityList');
   if (!container) return;
   container.innerHTML = '';
+  if (!liquidityPairs.length) {
+    container.innerHTML = '<div class="text-center text-xs text-gray-400 py-2">لا سعر حي — WS غير متصل</div>';
+    return;
+  }
   liquidityPairs.forEach((item, index) => {
     const el = document.createElement('div');
-    el.className = 'bg-[#121724]/90 p-2.5 rounded-xl border border-gray-800/60 flex items-center justify-between';
-    el.innerHTML = `<span class="font-bold text-gray-300 font-num">${index + 1}. ${item.pair}</span><span class="font-num text-amber-400/90 font-bold">${item.volume.toFixed(1)}B</span>`;
+    el.className =
+      'bg-[#121724]/90 p-2.5 rounded-xl border border-gray-800/60 flex items-center justify-between';
+    el.innerHTML = `<span class="font-bold text-gray-300 font-num">${index + 1}. ${item.pair}</span><span class="font-num text-amber-400/90 font-bold">${item.volume}</span>`;
     container.appendChild(el);
   });
 }
@@ -221,215 +143,32 @@ function renderLiquidity() {
 function renderHistory() {
   const container = document.getElementById('historyList');
   if (!container) return;
-  container.innerHTML = '';
-  tradeHistory.forEach(item => {
-    const el = document.createElement('div');
-    const isWin = item.pnl >= 0;
-    const typeText = item.type === 'BUY' ? 'شراء' : 'بيع';
-    el.className = 'bg-[#121724]/90 p-2.5 rounded-xl border border-gray-800/60 flex items-center justify-between';
-    el.innerHTML = `
-      <div>
-        <div class="flex items-center gap-1.5">
-          <span class="font-bold text-xs text-gray-200 font-num">${item.pair}</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded font-bold font-num ${item.type === 'BUY' ? 'bg-emerald-950/60 text-emerald-400/90' : 'bg-rose-950/60 text-rose-400/90'}">${typeText} ${item.lot}</span>
-        </div>
-        <div class="text-[10px] text-gray-400 mt-1 font-medium"><span>${item.day} - ${item.time}</span></div>
-      </div>
-      <div class="text-left font-num">
-        <div class="text-xs font-bold ${isWin ? 'text-emerald-400/90' : 'text-rose-400/90'}">${isWin ? '+' : ''}${item.pnl.toFixed(2)} $</div>
-        <div class="text-[10px] text-gray-400 mt-0.5">${item.entry} ← ${item.exit}</div>
-      </div>`;
-    container.appendChild(el);
-  });
+  container.innerHTML =
+    '<div class="text-center text-xs text-gray-400 py-2">سجل الصفقات: من المحرك/Binance — فارغ حالياً</div>';
 }
 
 function updateSignalTimerUI() {
   const timerEl = document.getElementById('signalTimer');
   if (!timerEl) return;
-  const secs = signalTimerSeconds < 10 ? `0${signalTimerSeconds}` : signalTimerSeconds;
-  timerEl.innerText = `00:${secs}`;
-}
-
-function startSignalCountdown() {
-  if (countdownTimer) clearInterval(countdownTimer);
-  countdownTimer = setInterval(() => {
-    if (!isRunning) return;
-    signalTimerSeconds--;
-    if (signalTimerSeconds <= 0) refreshSignals(false);
-    else updateSignalTimerUI();
-  }, 1000);
+  timerEl.innerText = 'API';
 }
 
 function refreshSignals(isManual = false) {
-  if (engineLive && engineLive.ws_connected) {
-    refreshFromEngineApis();
-    return;
-  }
+  refreshFromEngineApis(isManual);
+}
+
+async function refreshFromEngineApis(isManual = false) {
   const icon = document.getElementById('refreshIcon');
   if (icon) icon.classList.add('fa-spin');
-  const pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'AVAX/USDT'];
-  const timeframes = ['5m', '15m', '1h', '4h'];
-  signals = pairs.slice(0, 4).map((pair, idx) => {
-    const direction = Math.random() > 0.45 ? 'BUY' : 'SELL';
-    const strengthScore = Math.floor(72 + Math.random() * 25);
-    const timeframe = timeframes[Math.floor(Math.random() * timeframes.length)];
-    const rsi = Math.floor(direction === 'BUY' ? 50 + Math.random() * 25 : 20 + Math.random() * 25);
-    return {
-      id: Date.now() + idx,
-      pair,
-      direction,
-      strengthScore,
-      timeframe,
-      rsi: String(rsi),
-      macd: direction === 'BUY' ? 'إيجابي' : 'سلبي',
-      executed: false
-    };
-  });
-  if (isRunning) {
-    signals.forEach(sig => {
-      if (sig.strengthScore >= 85 && !sig.executed) {
-        sig.executed = true;
-        openPositions.push({
-          id: Date.now() + Math.floor(Math.random() * 1000),
-          pair: sig.pair,
-          type: sig.direction,
-          lot: '0.10',
-          entry: sig.direction === 'BUY' ? 65000 : 64000,
-          current: sig.direction === 'BUY' ? 65080 : 63920,
-          pnl: Math.round((Math.random() * 15 + 2) * 100) / 100
-        });
-        showToast(`🤖 دخول تلقائي: تم فتح صفقة ${sig.pair} بنجاح!`);
-      }
-    });
-  }
-  setTimeout(() => {
-    renderSignals();
-    renderPositions();
-    if (icon) icon.classList.remove('fa-spin');
-    signalTimerSeconds = SIGNAL_REFRESH_INTERVAL;
-    updateSignalTimerUI();
-    if (isManual) showToast('تم تحديث الإشارات الفنية بنجاح 📡');
-  }, 200);
-}
-
-function renderSignals() {
-  const container = document.getElementById('signalsList');
-  if (!container) return;
-  container.innerHTML = '';
-  signals.forEach(sig => {
-    const isBuy = sig.direction === 'BUY';
-    const strength = sig.strengthScore;
-    const card = document.createElement('div');
-    card.className = 'bg-[#121724]/90 px-3 py-2 rounded-xl border border-gray-800/60 flex items-center justify-between gap-2 transition-all hover:border-gold-500/20 shadow-sm';
-    let actionAreaHtml = '';
-    if (strength >= 85) {
-      actionAreaHtml = '<div class="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold flex items-center gap-1 cursor-default select-none shadow-sm"><i class="fa-solid fa-robot text-[10px]"></i><span>تم الدخول تلقائياً ✓</span></div>';
-    } else if (sig.executed) {
-      actionAreaHtml = '<button disabled class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400/90 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 cursor-not-allowed opacity-80"><i class="fa-solid fa-check text-[10px]"></i><span>تم الدخول ✓</span></button>';
-    } else {
-      actionAreaHtml = `<button type="button" data-exec="${sig.id}" class="px-2.5 py-1 rounded-lg ${isBuy ? 'bg-emerald-600/80 hover:bg-emerald-500/80 border-emerald-500/40' : 'bg-rose-600/80 hover:bg-rose-500/80 border-rose-500/40'} text-white border text-[10px] font-bold flex items-center gap-1 transition-all active:scale-95 shadow-sm"><i class="fa-solid ${isBuy ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down'} text-[9px]"></i><span>دخول مباشر</span></button>`;
-    }
-    card.innerHTML = `
-      <div class="flex items-center gap-2.5">
-        <div>
-          <div class="flex items-center gap-1.5">
-            <span class="font-bold text-xs font-num text-gray-200 tracking-wide">${sig.pair}</span>
-            <span class="text-[10px] px-1.5 py-0.2 rounded font-bold font-num ${isBuy ? 'bg-emerald-950/60 text-emerald-400/90 border border-emerald-500/20' : 'bg-rose-950/60 text-rose-400/90 border border-rose-500/20'}">${isBuy ? 'شراء' : 'بيع'}</span>
-            <span class="text-[10px] font-num font-bold text-gold-400/90 bg-gold-500/10 border border-gold-500/20 px-1.5 py-0.2 rounded">${strength}%</span>
-          </div>
-          <div class="text-[10px] text-gray-400 mt-1 flex items-center gap-2 font-medium">
-            <span>الإطار: <strong class="text-gray-300 font-num">${sig.timeframe}</strong></span>
-            <span>RSI: <strong class="text-gray-300 font-num">${sig.rsi}</strong></span>
-            <span>MACD: <strong class="${isBuy ? 'text-emerald-400/90' : 'text-rose-400/90'} font-bold">${sig.macd}</strong></span>
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center">${actionAreaHtml}</div>`;
-    const execBtn = card.querySelector('[data-exec]');
-    if (execBtn) execBtn.onclick = () => executeTrade(sig.id);
-    container.appendChild(card);
-  });
-}
-
-function executeTrade(signalId) {
-  const sig = signals.find(s => s.id === Number(signalId));
-  if (!sig || sig.executed) return;
-  sig.executed = true;
-  openPositions.push({
-    id: Date.now(),
-    pair: sig.pair,
-    type: sig.direction,
-    lot: '0.10',
-    entry: sig.direction === 'BUY' ? 65000 : 64000,
-    current: sig.direction === 'BUY' ? 65100 : 63900,
-    pnl: 10.0
-  });
-  renderSignals();
-  renderPositions();
-  showToast(`🚀 تم فتح الصفقة بنجاح على ${sig.pair}`);
-}
-
-function emergencyCloseAll() {
-  openPositions = [];
-  renderPositions();
-  showToast('🚨 تم إرسال أمر الإغلاق الطارئ لجميع الصفقات');
-}
-
-function toggleBotState() {
-  isRunning = !isRunning;
-  const icon = document.getElementById('botBtnIcon');
-  const text = document.getElementById('botBtnText');
-  const statusText = document.getElementById('statusText');
-  const statusDot = document.getElementById('statusDot');
-  const statusPing = document.getElementById('statusPing');
-  if (isRunning) {
-    icon.className = 'fa-solid fa-pause text-[10px]';
-    text.innerText = 'إيقاف عمليات البوت مؤقتاً';
-    statusText.innerText = 'النظام: نشط';
-    statusText.className = 'text-[11px] font-bold text-emerald-400/90 tracking-wide';
-    statusDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500';
-    statusPing.classList.remove('hidden');
-    showToast('تم استئناف عمل البوت');
-  } else {
-    icon.className = 'fa-solid fa-play text-[10px]';
-    text.innerText = 'استئناف عمليات البوت';
-    statusText.innerText = 'النظام: متوقف مؤقتاً';
-    statusText.className = 'text-[11px] font-bold text-amber-400/90 tracking-wide';
-    statusDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500';
-    statusPing.classList.add('hidden');
-    showToast('تم إيقاف البوت مؤقتاً');
-  }
-}
-
-function toggleAlerts() {
-  alertActive = !alertActive;
-  const alertText = document.getElementById('alertText');
-  const alertIcon = document.getElementById('alertIcon');
-  if (alertActive) {
-    alertText.innerText = 'التنبيهات مفعلة';
-    alertIcon.className = 'fa-solid fa-bell text-gold-400/80 text-[10px]';
-    showToast('تم تفعيل التنبيهات');
-  } else {
-    alertText.innerText = 'التنبيهات متوقفة';
-    alertIcon.className = 'fa-solid fa-bell-slash text-gray-500 text-[10px]';
-    showToast('تم إيقاف التنبيهات');
-  }
-}
-
-function updateSyncClock() {
-  const el = document.getElementById('syncTime');
-  if (!el) return;
-  el.innerText = new Date().toLocaleTimeString('ar-IQ', { hour12: false });
-}
-
-async function refreshFromEngineApis() {
   try {
-    const [sigRes, posRes, engRes, statusRes] = await Promise.all([
+    const [sigRes, posRes, engRes, statusRes, mirrorRes] = await Promise.all([
       fetch('/api/signals'),
       fetch('/api/positions'),
       fetch('/api/engine'),
-      fetch('/api/status')
+      fetch('/api/status'),
+      fetch('/api/binance_mirror'),
     ]);
+
     if (sigRes.ok) {
       const sigJson = await sigRes.json();
       if (Array.isArray(sigJson)) {
@@ -440,12 +179,12 @@ async function refreshFromEngineApis() {
           strengthScore: s.strength_score ?? s.strengthScore ?? 0,
           timeframe: s.timeframe || 'live',
           rsi: String(Math.round(s.sovereign_score ?? 50)),
-          macd: (s.hira_boost ?? 0) > 0 ? 'إيجابي' : 'محايد',
-          executed: !!s.executed
+          executed: !!s.executed,
         }));
         renderSignals();
       }
     }
+
     if (posRes.ok) {
       const posJson = await posRes.json();
       if (Array.isArray(posJson)) {
@@ -456,40 +195,44 @@ async function refreshFromEngineApis() {
           lot: p.lot,
           entry: p.entry,
           current: p.current,
-          pnl: p.pnl
+          pnl: p.pnl,
         }));
         renderPositions();
       }
     }
+
+    if (mirrorRes.ok) {
+      mirrorLive = await mirrorRes.json();
+      const banner = document.getElementById('mirrorBanner');
+      if (banner) {
+        const err = mirrorLive.binance_error;
+        banner.innerText = err
+          ? `مرآة: محرك حي — Binance: ${err}`
+          : `مرآة حية | WS: ${mirrorLive.ws_connected ? 'نعم' : 'لا'} | أوامr Binance: ${mirrorLive.open_orders_on_binance ?? 0} | إشارات: ${mirrorLive.engine_signal_count ?? 0}`;
+      }
+    }
+
     if (statusRes.ok) {
       const st = await statusRes.json();
       const balEl = document.getElementById('totalBalance');
       const pctEl = document.getElementById('dailyProfitPct');
-      if (balEl && st.initial_balance_usd != null) {
-        balEl.innerText = `${Number(st.initial_balance_usd).toLocaleString('en-US', { minimumFractionDigits: 2 })} $`;
-      }
-      if (pctEl) {
-        const mode = st.mode || 'demo';
-        const tr = st.enable_trading ? 'تداول ON' : 'تداول OFF';
-        pctEl.innerText = `${mode} · ${tr}`;
-        pctEl.className = 'text-[11px] font-num font-bold text-gold-400/90 mt-0.5';
-      }
-      const posCnt = document.getElementById('activePositionsCount');
-      if (posCnt && openPositions) posCnt.innerText = String(openPositions.length);
-      if (st.binance_live_price > 0) {
-        const liq = document.getElementById('liquidityList');
-        if (liq && st.symbol) {
-          const sym = st.symbol.endsWith('USDT')
-            ? st.symbol.replace('USDT', ' / USDT')
-            : st.symbol;
-          liquidityPairs = [{ pair: sym, volume: st.binance_live_price }];
-          renderLiquidity();
+      if (balEl) {
+        if (mirrorLive && mirrorLive.usdt_free != null) {
+          balEl.innerText = `${Number(mirrorLive.usdt_free).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT (Binance)`;
+        } else if (st.initial_balance_usd != null) {
+          balEl.innerText = `${Number(st.initial_balance_usd).toFixed(2)} $ (إعداد)`;
         }
-        if (pctEl && engineLive && engineLive.ws_connected) {
-          pctEl.innerText = `${Number(st.binance_live_price).toFixed(2)} USDT`;
-        }
+      }
+      if (pctEl && st.binance_live_price > 0) {
+        pctEl.innerText = `${Number(st.binance_live_price).toFixed(2)} · ${st.mode || 'demo'}`;
+      }
+      if (st.binance_live_price > 0 && st.symbol) {
+        const sym = st.symbol.endsWith('USDT') ? st.symbol.replace('USDT', ' / USDT') : st.symbol;
+        liquidityPairs = [{ pair: sym, volume: `${Number(st.binance_live_price).toFixed(2)} USDT` }];
+        renderLiquidity();
       }
     }
+
     if (engRes.ok) {
       engineLive = await engRes.json();
       const statusText = document.getElementById('statusText');
@@ -497,7 +240,7 @@ async function refreshFromEngineApis() {
       const statusPing = document.getElementById('statusPing');
       if (statusText && engineLive) {
         const ws = engineLive.ws_connected ? 'WS متصل' : 'WS غير متصل';
-        statusText.innerText = `النظام: ${ws} | ${engineLive.last_verdict || '—'}`;
+        statusText.innerText = `مرآة: ${ws} | ${engineLive.last_verdict || '—'}`;
         if (engineLive.emergency_lock || engineLive.stream_frozen) {
           statusText.className = 'text-[11px] font-bold text-red-400/90 tracking-wide';
           if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500';
@@ -505,9 +248,23 @@ async function refreshFromEngineApis() {
         }
       }
     }
+
+    if (isManual) showToast('تم تحديث المرآة من API');
   } catch (_) {
-    /* offline demo */
+    showToast('المحرك غير متصل — شغّل SAQR_RUN.bat');
+  } finally {
+    if (icon) icon.classList.remove('fa-spin');
   }
+}
+
+function toggleAlerts() {
+  alertActive = !alertActive;
+  showToast(alertActive ? 'تنبيهات الواجهة مفعّلة' : 'متوقفة');
+}
+
+function updateSyncClock() {
+  const el = document.getElementById('syncTime');
+  if (el) el.innerText = new Date().toLocaleTimeString('ar-IQ', { hour12: false });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -516,10 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLiquidity();
   renderHistory();
   updateSignalTimerUI();
-  startSignalCountdown();
   updateSyncClock();
   setInterval(updateSyncClock, 1000);
   refreshFromEngineApis();
-  setInterval(refreshFromEngineApis, 3000);
+  setInterval(refreshFromEngineApis, API_POLL_MS);
   fetch('/api/health').catch(() => {});
 });

@@ -1,10 +1,12 @@
 use std::net::SocketAddr;
+use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
 
 use axum::extract::State;
 use axum::response::{IntoResponse, Json};
 use axum::routing::get;
 use axum::Router;
+use saqr_core::binance::signed_rest::BinanceSignedRest;
 use saqr_core::config::env_settings::SaqrSettings;
 use saqr_core::engine::runtime::EngineRuntime;
 use tower_http::cors::CorsLayer;
@@ -14,16 +16,19 @@ use tower_http::services::ServeDir;
 pub struct AppState {
     pub settings: Arc<SaqrSettings>,
     pub engine: Arc<EngineRuntime>,
+    pub time_offset: Arc<AtomicI64>,
 }
 
 pub async fn start_web(
     settings: SaqrSettings,
     engine: Arc<EngineRuntime>,
+    time_offset: Arc<AtomicI64>,
     web_root: &str,
 ) -> Result<(), std::io::Error> {
     let state = AppState {
         settings: Arc::new(settings.clone()),
         engine,
+        time_offset,
     };
     let app = Router::new()
         .route("/api/health", get(health))
@@ -31,6 +36,7 @@ pub async fn start_web(
         .route("/api/engine", get(engine_status))
         .route("/api/signals", get(signals))
         .route("/api/positions", get(positions))
+        .route("/api/binance_mirror", get(binance_mirror))
         .nest_service("/", ServeDir::new(web_root))
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -91,4 +97,60 @@ async fn positions(State(st): State<AppState>) -> impl IntoResponse {
         p.pnl = (price - p.entry) * p.lot.parse::<f64>().unwrap_or(0.0);
     }
     Json(list)
+}
+
+/// مرآة Binance Testnet: أرصدة + أوامr مفتوحة (لا بيانات وهمية).
+async fn binance_mirror(State(st): State<AppState>) -> impl IntoResponse {
+    let symbol = st.settings.symbol.clone();
+    let eng = st.engine.status.read().clone();
+    let mut out = serde_json::json!({
+        "mirror": true,
+        "source": "binance_testnet + saqr_engine",
+        "symbol": symbol,
+        "ws_connected": eng.ws_connected,
+        "engine_price": eng.last_price,
+        "engine_verdict": eng.last_verdict,
+        "engine_signal_count": st.engine.signals.read().len(),
+        "engine_position_count": st.engine.positions.read().len(),
+        "enable_trading": st.settings.enable_trading,
+        "mode": st.settings.mode,
+        "api_configured": !st.settings.api_key.is_empty(),
+        "usdt_free": null,
+        "base_asset_free": null,
+        "open_orders_on_binance": 0,
+        "binance_error": null,
+    });
+
+    if st.settings.api_key.is_empty() {
+        out["binance_error"] = serde_json::json!("BINANCE_API_KEY not set — public price only");
+        return Json(out);
+    }
+
+    let signed = BinanceSignedRest::new(st.settings.as_ref().clone(), Arc::clone(&st.time_offset));
+    match signed.get_account().await {
+        Ok(acct) => {
+            for b in acct.balances {
+                let free: f64 = b.free.parse().unwrap_or(0.0);
+                if free <= 0.0 {
+                    continue;
+                }
+                if b.asset == "USDT" {
+                    out["usdt_free"] = serde_json::json!(free);
+                }
+                let base = symbol.trim_end_matches("USDT");
+                if b.asset == base {
+                    out["base_asset_free"] = serde_json::json!(free);
+                }
+            }
+        }
+        Err(e) => {
+            out["binance_error"] = serde_json::json!(e);
+        }
+    }
+
+    if let Ok(orders) = signed.open_orders(&symbol).await {
+        out["open_orders_on_binance"] = serde_json::json!(orders.len());
+    }
+
+    Json(out)
 }

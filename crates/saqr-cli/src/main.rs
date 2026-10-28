@@ -98,9 +98,10 @@ async fn run_engine(
 
     let web_root = resolve_web_root();
     let engine = Arc::clone(&launched.runtime);
+    let time_offset = Arc::clone(&launched.time_offset);
     let settings_web = settings.clone();
     tokio::spawn(async move {
-        if let Err(e) = web_server::start_web(settings_web, engine, &web_root).await {
+        if let Err(e) = web_server::start_web(settings_web, engine, time_offset, &web_root).await {
             tracing::error!("web server error: {e}");
         }
     });
