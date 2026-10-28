@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
+# Builds Saqr-Windows-Complete-*.zip (official home launcher package)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-VERSION="${1:-6.0.3}"
-OUT="$ROOT/dist/Saqr-Windows-Home-v${VERSION}"
-ZIP="$ROOT/dist/Saqr-Windows-Home-v${VERSION}.zip"
+VERSION="${1:-6.1.0}"
+LAUNCH="$ROOT/deploy/saqr-launcher"
+OUT="$ROOT/dist/Saqr-Windows-Complete-v${VERSION}"
+ZIP="$ROOT/dist/Saqr-Windows-Complete-v${VERSION}.zip"
 
-python3 scripts/fix-bat-crlf.py
+python3 "$ROOT/scripts/fix-bat-crlf.py" "$LAUNCH" 2>/dev/null || python3 "$ROOT/scripts/fix-bat-crlf.py"
+
 echo "Building Windows GNU target..."
 cargo build --release -p saqr-cli --target x86_64-pc-windows-gnu
 
@@ -15,15 +18,12 @@ mkdir -p "$OUT/bin" "$OUT/web/control_terminal" "$OUT/logs" "$OUT/data"
 
 cp "target/x86_64-pc-windows-gnu/release/saqr.exe" "$OUT/bin/saqr.exe"
 cp -a web/control_terminal/. "$OUT/web/control_terminal/"
-cp deploy/windows-local/env.template "$OUT/env.template"
-cp deploy/windows-local/README_AR.md "$OUT/اقرأني.txt"
-cp deploy/windows-local/START_SAQR.bat "$OUT/START_SAQR.bat"
-cp deploy/windows-local/OPEN_DASHBOARD.bat "$OUT/OPEN_DASHBOARD.bat"
-cp deploy/windows-local/CREATE_ENV.bat "$OUT/CREATE_ENV.bat"
-cp deploy/windows-local/DIAGNOSE.bat "$OUT/DIAGNOSE.bat"
-cp deploy/windows-local/TROUBLESHOOT_AR.md "$OUT/TROUBLESHOOT_AR.md"
-cp deploy/windows-local/START_SAQR.ps1 "$OUT/START_SAQR.ps1"
-python3 scripts/fix-bat-crlf.py "$OUT"
+cp "$LAUNCH"/SAQR_RUN.bat "$LAUNCH"/SAQR_RUN.ps1 "$OUT/"
+cp "$LAUNCH"/SAQR_DIAGNOSE.bat "$LAUNCH"/SAQR_DIAGNOSE.ps1 "$OUT/"
+cp "$LAUNCH"/env.template "$OUT/env.template"
+cp "$LAUNCH"/دليل_التشغيل_من_الألف_للياء.md "$OUT/دليل_التشغيل.md"
+
+python3 "$ROOT/scripts/fix-bat-crlf.py" "$OUT"
 
 cd "$ROOT/dist"
 rm -f "$ZIP"

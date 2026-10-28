@@ -4,9 +4,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-targets = [ROOT / "deploy" / "windows-local"]
+targets = [
+    ROOT / "deploy" / "windows-local",
+    ROOT / "deploy" / "saqr-launcher",
+]
 if len(sys.argv) > 1:
-    targets = [Path(sys.argv[1])]
+    targets = [Path(p) for p in sys.argv[1:]]
 
 for folder in targets:
     for path in folder.glob("*.bat"):

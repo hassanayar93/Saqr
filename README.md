@@ -21,9 +21,10 @@ cargo run --release --bin saqr
 
 `SAQR_MODE=demo` — لا live trading حتى تغيّر الإعدادات صراحة.
 
-## تشغيل على حاسوب Windows (بدون VPS — مؤقت)
+## تشغيل على Windows (حاسوب — بدون VPS)
 
-1. **حزمة جاهزة:** [Releases](https://github.com/hassanayar93/Saqr/releases) → `Saqr-Windows-Home-*.zip`  
-2. **من المصدر:** راجع [deploy/windows-local/README_AR.md](./deploy/windows-local/README_AR.md)
+1. [Releases](https://github.com/hassanayar93/Saqr/releases) → **`Saqr-Windows-Complete-*.zip`**
+2. فك الضغط → **`SAQR_RUN.bat`**
+3. الدليل الكامل: [deploy/saqr-launcher/دليل_التشغيل_من_الألف_للياء.md](./deploy/saqr-launcher/دليل_التشغيل_من_الألف_للياء.md)
 
-لا يمكن نقل الملفات تلقائياً إلى جهازك من Cloud Agent — التنزيل من GitHub فقط.
+لا مكتبات Python/Node — فقط `bin\saqr.exe` + `.env`.

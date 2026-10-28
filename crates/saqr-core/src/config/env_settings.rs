@@ -109,7 +109,7 @@ impl SaqrSettings {
             },
             web_bind_host: env::var("SAQR_WEB_BIND_HOST").unwrap_or_else(|_| "127.0.0.1".into()),
             web_bind_port: env_u16("SAQR_WEB_BIND_PORT", 8787),
-            require_integrated_demo: env_bool("SAQR_REQUIRE_INTEGRATED_DEMO", true),
+            require_integrated_demo: env_bool("SAQR_REQUIRE_INTEGRATED_DEMO", false),
         }
     }
 }
