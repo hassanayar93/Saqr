@@ -59,7 +59,8 @@ impl SaqrSettings {
         });
         let ws = env::var("BINANCE_WS_URL").unwrap_or_else(|_| {
             if testnet {
-                "wss://testnet.binance.vision".into()
+                // Combined /stream on testnet.binance.vision often 404; stream host is stable.
+                "wss://stream.testnet.binance.vision".into()
             } else {
                 "wss://stream.binance.com:9443".into()
             }
