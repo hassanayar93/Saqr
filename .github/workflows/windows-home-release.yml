@@ -1,0 +1,39 @@
+name: Windows Home Bundle
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+
+      - name: Install mingw
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 zip
+
+      - name: Build bundle
+        run: bash scripts/build-windows-home-bundle.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saqr-Windows-Home
+          path: dist/Saqr-Windows-Home-*.zip
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Saqr-Windows-Home-*.zip
+          generate_release_notes: true

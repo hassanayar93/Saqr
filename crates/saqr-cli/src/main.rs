@@ -84,10 +84,20 @@ async fn run_engine(
 }
 
 fn resolve_web_root() -> String {
-    let candidates = [
+    let mut candidates = vec![
+        PathBuf::from("web/control_terminal"),
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/control_terminal"),
         PathBuf::from("/home/ubuntu/saqr/web/control_terminal"),
     ];
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("web/control_terminal"));
+            candidates.push(dir.join("../web/control_terminal"));
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("web/control_terminal"));
+    }
     for p in candidates {
         if p.join("index.html").is_file() {
             return p.to_string_lossy().into_owned();
