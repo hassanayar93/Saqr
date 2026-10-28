@@ -15,14 +15,45 @@ use saqr_core::orchestrator::phase4_master_orchestrator::Phase4MasterOrchestrato
 use saqr_core::telegram::anti_flood::TelegramAntiFlood;
 use tokio::sync::mpsc;
 
+fn print_cli_help() {
+    eprintln!(
+        "SAQR v{}\n  --version    show version\n  --check      validate .env and exit\n  (no args)    run engine + dashboard",
+        env!("CARGO_PKG_VERSION")
+    );
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print_cli_help();
+        return ExitCode::SUCCESS;
+    }
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("SAQR {}", env!("CARGO_PKG_VERSION"));
+        return ExitCode::SUCCESS;
+    }
+
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
     let settings = SaqrSettings::from_env();
+    if args.iter().any(|a| a == "--check") {
+        match settings.validate() {
+            Ok(()) => {
+                tracing::info!("OK: .env validation passed (mode={})", settings.mode);
+                return ExitCode::SUCCESS;
+            }
+            Err(errors) => {
+                for e in &errors {
+                    tracing::error!("validation: {e}");
+                }
+                return ExitCode::from(1);
+            }
+        }
+    }
     if let Err(errors) = settings.validate() {
         for e in &errors {
             tracing::error!("settings validation: {e}");
